@@ -228,11 +228,6 @@ Offline decoder (algorithm reference):
 
 ---
 
-## 📜 License
-
-MIT License (or your preferred license)
-
----
 
 ## 🙌 Acknowledgements
 
