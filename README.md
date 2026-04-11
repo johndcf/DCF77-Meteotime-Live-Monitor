@@ -1,4 +1,4 @@
-## DCF77 Meteotime Live Monitor
+# DCF77 Meteotime Live Monitor
 
 A real-time DCF77 receiver and Meteotime weather decoder running on a Raspberry Pi.
 This project decodes the DCF77 signal, extracts Meteotime weather data, and provides a live JSON status output for web-based visualization.
@@ -44,7 +44,7 @@ Raspberry Pi (GPIO)
 Live Decoder (Python)
       │
       ▼
-status.json (updated continuously)
+dcf77_status.json (updated continuously)
       │
       ▼
 Web Server / Browser UI
@@ -60,14 +60,18 @@ Web Server / Browser UI
 
 ### Example wiring
 
-| DCF77 Module    | Raspberry Pi            |
-| --------------- | ----------------------- |
-| VCC             | 3.3V                    |
-| GND             | GND                     |
-| DATA            | GPIO (e.g. GPIO17)      |
-| PON (if present)| Power Enable (often GND)|
+| DCF77 Module     | Raspberry Pi             |
+| ---------------- | ------------------------ |
+| VCC              | 3.3V                     |
+| GND              | GND                      |
+| DATA             | GPIO17 (default)         |
+| PON (if present) | Power Enable (often GND) |
 
-> Note: Signal is typically **inverted**.
+> Note:
+>
+> * The signal is typically **inverted**
+> * Internal pull-up is enabled in software
+> * Default input pin: **GPIO17**
 
 ---
 
@@ -105,7 +109,7 @@ python3 dcf77_meteotime_live.py
 The script continuously writes a status file:
 
 ```
-/tmp/status.json
+/tmp/dcf77_status.json
 ```
 
 Example structure:
@@ -146,7 +150,7 @@ python3 -m http.server 8000
 Then open in browser:
 
 ```
-http://<raspberrypi-ip>:8000/status.json
+http://<raspberrypi-ip>:8000/dcf77_status.json
 ```
 
 ---
@@ -191,7 +195,7 @@ Description=DCF77 Meteotime Live Decoder
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/python3 /home/pi/dcf77_meteotime_live.py
+ExecStart=/usr/bin/python3 /home/<user>/dcf77_meteotime_live.py
 Restart=always
 
 [Install]
@@ -228,7 +232,6 @@ Offline decoder (algorithm reference):
 
 ---
 
-
 ## 🙌 Acknowledgements
 
 * DCF77 time signal (77.5 kHz, Germany)
@@ -237,11 +240,11 @@ Offline decoder (algorithm reference):
 
 ---
 
-## 📸 Example 
+## 📸 Example
 
 * Very simple live web view
-<img width="1425" height="171" alt="image" src="https://github.com/user-attachments/assets/df58ba11-3ecb-420d-b77e-3b39c5d4a902" />
 
+<img width="1425" height="171" alt="image" src="https://github.com/user-attachments/assets/df58ba11-3ecb-420d-b77e-3b39c5d4a902" />
 
 ---
 
@@ -256,11 +259,10 @@ The author is not affiliated with, endorsed by, or connected to Meteotime or any
 
 Any use of this project is at your own responsibility.
 
+---
 
 ## 🚀 Future Ideas
 
-* historical logging
+* Historical logging
 * Grafana integration
 * MQTT publishing
----
-
