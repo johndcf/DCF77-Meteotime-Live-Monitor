@@ -20,9 +20,9 @@ from gpiozero import DigitalInputDevice
 
 PIN = 17
 
-# Für dein Modul:
-# - OUT ist invertiert
-# - Pull-up wird gebraucht
+# Used by many modules but may be to be changed:
+# - OUT is inverted
+# - Pull-up is needed
 dcf = DigitalInputDevice(PIN, pull_up=True)
 
 
@@ -339,7 +339,7 @@ WIND_DIRECTION_CODES = {
     23: "NW",
     24: "wechselnd",
     25: "Fön",
-    26: "Biese NO",
+    26: "Bise NO",
     27: "Mistral N",
     28: "Scirocco S",
     29: "Tramont. W",
@@ -355,7 +355,7 @@ WIND_DIRECTION_CODES = {
     39: "NW",
     40: "wechselnd",
     41: "Fön",
-    42: "Biese NO",
+    42: "Bise NO",
     43: "Mistral N",
     44: "Scirocco S",
     45: "Tramont. W",
@@ -371,7 +371,7 @@ WIND_DIRECTION_CODES = {
     55: "NW",
     56: "wechselnd",
     57: "Fön",
-    58: "Biese NO",
+    58: "Bise NO",
     59: "Mistral N",
     60: "Scirocco S",
     61: "Tramont. W",
@@ -387,7 +387,7 @@ WIND_DIRECTION_CODES = {
     71: "NW",
     72: "wechselnd",
     73: "Fön",
-    74: "Biese NO",
+    74: "Bise NO",
     75: "Mistral N",
     76: "Scirocco S",
     77: "Tramont. W",
@@ -419,7 +419,7 @@ WIND_DIRECTION_CODES = {
     103: "NW",
     104: "wechselnd",
     105: "Fön",
-    106: "Biese NO",
+    106: "Bise NO",
     107: "Mistral N",
     108: "Scirocco S",
     109: "Tramont. W",
@@ -435,7 +435,7 @@ WIND_DIRECTION_CODES = {
     119: "NW",
     120: "wechselnd",
     121: "Fön",
-    122: "Biese NO",
+    122: "Bise NO",
     123: "Mistral N",
     124: "Scirocco S",
     125: "Tramont. W",
@@ -455,18 +455,66 @@ WIND_FORCE = {
 }
 
 REGIONS_ALL = {
-    0: "Bordeaux", 1: "La Rochelle", 2: "Paris", 3: "Brest", 4: "Clermont-Ferrand",
-    5: "Béziers", 6: "Bruxelles", 7: "Dijon", 8: "Marseille", 9: "Lyon",
-    10: "Grenoble", 11: "La Chaux-de-Fonds", 12: "Frankfurt am Main", 13: "Westl. Mittelgebirge",
-    14: "Duisburg", 15: "Swansea", 16: "Manchester", 17: "Le Havre", 18: "London",
-    19: "Bremerhaven", 20: "Herning", 21: "Århus", 22: "Hannover", 23: "København",
-    24: "Rostock", 25: "Ingolstadt", 26: "München", 27: "Bolzano", 28: "Nürnberg",
-    29: "Leipzig", 30: "Erfurt", 31: "Lausanne", 32: "Zürich", 33: "Adelboden",
-    34: "Sion", 35: "Glarus", 36: "Davos", 37: "Kassel", 38: "Locarno",
-    39: "Sestriere", 40: "Milano", 41: "Roma", 42: "Amsterdam", 43: "Génova",
-    44: "Venezia", 45: "Strasbourg", 46: "Klagenfurt", 47: "Innsbruck", 48: "Salzburg",
-    49: "Bratislava", 50: "Praha", 51: "Decin", 52: "Berlin", 53: "Göteborg",
-    59: "Stuttgart",
+    0: "Bordeaux / Südwestfrankreich",
+    1: "La Rochelle / Westküste Frankreich",
+    2: "Paris / Pariser Becken",
+    3: "Brest / Bretagne",
+    4: "Clermont-Ferrand / Zentralmassif",
+    5: "Béziers / Languedoc-Roussillon",
+    6: "Bruxelles / Benelux",
+    7: "Dijon / Ostfrankreich (Burgund)",
+    8: "Marseille / Südfrankreich",
+    9: "Lyon / Rhonetal",
+    10: "Grenoble / Französische Alpen",
+    11: "La Chaux-de-Fonds / Jura",
+    12: "Frankfurt am Main / Unterer Rheingraben",
+    13: "Westl. Mittelgebirge / Westliches Mittelgebirge",
+    14: "Duisburg / Nordrhein-Westfalen",
+    15: "Swansea / Westl. England & Wales",
+    16: "Manchester / Nördliches England",
+    17: "Le Havre / Normandie",
+    18: "London / Südostengland",
+    19: "Bremerhaven / Nordseeküste",
+    20: "Herning / Nordwestliches Jütland",
+    21: "Århus / Östliches Jütland",
+    22: "Hannover / Norddeutschland",
+    23: "København / Seeland",
+    24: "Rostock / Ostseeküste",
+    25: "Ingolstadt / Donautal",
+    26: "München / Südbayern",
+    27: "Bolzano / Südtirol",
+    28: "Nürnberg / Nordbayern",
+    29: "Leipzig / Sachsen",
+    30: "Erfurt / Thüringen",
+    31: "Lausanne / Westliches Schweizer Mittelland",
+    32: "Zürich / Östliches Schweizer Mittelland",
+    33: "Adelboden / Westlicher Schweizer Alpennordhang",
+    34: "Sion / Wallis",
+    35: "Glarus / Östlicher Schweizer Alpennordhang",
+    36: "Davos / Graubünden",
+    37: "Kassel / Mittelgebirge Ost",
+    38: "Locarno / Tessin",
+    39: "Sestriere / Piemont Alpen",
+    40: "Milano / Poebene",
+    41: "Roma / Toskana",
+    42: "Amsterdam / Holland",
+    43: "Génova / Golf von Genua",
+    44: "Venezia / Pomündung",
+    45: "Strasbourg / Oberer Rheingraben",
+    46: "Klagenfurt / Österreichischer Alpensüdhang",
+    47: "Innsbruck / Inneralpine Gebiete Österreich",
+    48: "Salzburg / Alpennordhang Bayern/Österreich",
+    49: "Bratislava / Wien-Region (AT/SK)",
+    50: "Praha / Tschechisches Becken",
+    51: "Decin / Erzgebirge",
+    52: "Berlin / Ostdeutschland",
+    53: "Göteborg / Westküste Schweden",
+    54: "Stockholm / Stockholm-Region",
+    55: "Kalmar / Schwedische Ostseeküste",
+    56: "Jönköping / Südschweden",
+    57: "Donaueschingen / Schwarzwald & Schwäbische Alb",
+    58: "Oslo / Oslo-Region",
+    59: "Stuttgart / Nördliches Baden-Württemberg",
     60: "Napoli", 61: "Ancona", 62: "Bari", 63: "Budapest", 64: "Madrid",
     65: "Bilbao", 66: "Palermo", 67: "Palma de Mallorca", 68: "Valencia", 69: "Barcelona",
     70: "Andorra", 71: "Sevilla", 72: "Lissabon", 73: "Sassari", 74: "Gijon",
@@ -691,7 +739,7 @@ def decode_time_minute(bits59: List[int]):
 
 
 # ============================================================
-# Referenzdecoder-Helfer
+# Reference decoder helper
 # ============================================================
 
 def parity_ok(a, s, e):
