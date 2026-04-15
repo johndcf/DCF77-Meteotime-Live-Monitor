@@ -13,6 +13,7 @@ from typing import List, Optional
 
 from gpiozero import DigitalInputDevice
 
+ENABLE_SECTION7_OVERRIDE = False
 
 # ============================================================
 # GPIO / DCF77 input
@@ -290,9 +291,9 @@ WEATHER_CODES_NIGHT = {
 }
 
 EXTREME_CODES = {
-    0: "Kein", 1: "Schweres Wetter 24 Std.", 2: "Schweres Wetter Tag",
-    3: "Schweres Wetter Nacht", 4: "Sturm", 5: "Sturm Tag",
-    6: "Sturm Nacht", 7: "Böen Tag", 8: "Böen Nacht",
+    0: "Kein", 1: "Schweres Wetter 24 Std.", 2: "Schweres Wetter (Tag)",
+    3: "Schweres Wetter (Nacht)", 4: "Sturm", 5: "Sturm (Tag)",
+    6: "Sturm (Nacht)", 7: "Böen (Tag)", 8: "Böen (Nacht)",
     9: "Eisregen Vormittag", 10: "Eisregen Nachmittag",
     11: "Eisregen Nacht", 12: "Feinstaub", 13: "Ozon",
     14: "Radiation", 15: "Hochwasser",
@@ -403,7 +404,7 @@ WIND_DIRECTION_CODES = {
     87: "NW",
     88: "wechselnd",
     89: "Fön",
-    90: "Biese NO",
+    90: "Bise NO",
     91: "Mistral N",
     92: "Scirocco S",
     93: "Tramont. W",
@@ -524,14 +525,14 @@ REGIONS_ALL = {
 }
 
 SECTION_INFO = {
-    0: ("Heute", "Hoch", "Extrem/Regen"),
-    1: ("Heute", "Tief", "Wind"),
-    2: ("Tag 1", "Hoch", "Extrem/Regen"),
-    3: ("Tag 1", "Tief", "Wind"),
-    4: ("Tag 2", "Hoch", "Extrem/Regen"),
-    5: ("Tag 2", "Tief", "Wind"),
-    6: ("Tag 3", "Hoch", "Extrem/Regen"),
-    7: ("Tag 3", "Wind/Anomalie", "Wind"),
+    0: ("Heute", "Tag-Block", "12h Tag + 24h Schweres Wetter/Regen"),
+    1: ("Heute", "Nacht-Block", "12h Nacht + 24h Wind"),
+    2: ("Tag 1", "Tag-Block", "12h Tag + 24h Schweres Wetter/Regen"),
+    3: ("Tag 1", "Nacht-Block", "12h Nacht + 24h Wind"),
+    4: ("Tag 2", "Tag-Block", "12h Tag + 24h Schweres Wetter/Regen"),
+    5: ("Tag 2", "Nacht-Block", "12h Nacht + 24h Wind"),
+    6: ("Tag 3", "Tag-Block", "12h Tag + 24h Schweres Wetter/Regen"),
+    7: ("ungenutzt", "ungenutzt", "ungenutzt"),
 }
 
 
@@ -975,6 +976,7 @@ def decode_weather_info(payload: int):
         'wind_full_code': wind_full_code,
         'wind_direction': WIND_DIRECTION_CODES.get(wind_full_code, f'Code {wind_full_code}'),
         'wind_force': WIND_FORCE.get(rain_group, f'Code {rain_group}'),
+        'wind_direction_valid_when_anomaly_bit_is_0': True,
         'temp_code': temp_code,
         'temp_text': temp_text,
     }
@@ -1022,11 +1024,43 @@ def get_minutes_since_2200_utc_anchor(row: Row) -> int:
 
 def get_area_section(row: Row):
     minutes = get_minutes_since_2200_utc_anchor(row)
-    area = (minutes % (60 * 3)) // 3
-    area -= 1
-    if area < 0:
-        area += 60
-    section = minutes // (60 * 3)
+
+    # Meteotime send schema in UTC:
+    # 22:00 - 03:59  regions 0..59  -> Heute   (sections 0/1, 6 min per region)
+    # 04:00 - 09:59  regions 0..59  -> Tag 1   (sections 2/3, 6 min per region)
+    # 10:00 - 15:59  regions 0..59  -> Tag 2   (sections 4/5, 6 min per region)
+    # 16:00 - 18:59  regions 0..59  -> Tag 3   (section 6 only, 3 min per region)
+    # 19:00 - 20:29  regions 60..89 -> Heute   (2-day model, HI only)
+    # 20:30 - 21:59  regions 60..89 -> Tag 1   (2-day model, HI only)
+
+    if 0 <= minutes <= 179:          # 22:00 - 00:59 UTC
+        area = minutes // 3
+        section = 0
+    elif 180 <= minutes <= 359:      # 01:00 - 03:59 UTC
+        area = (minutes - 180) // 3
+        section = 1
+    elif 360 <= minutes <= 539:      # 04:00 - 06:59 UTC
+        area = (minutes - 360) // 3
+        section = 2
+    elif 540 <= minutes <= 719:      # 07:00 - 09:59 UTC
+        area = (minutes - 540) // 3
+        section = 3
+    elif 720 <= minutes <= 899:      # 10:00 - 12:59 UTC
+        area = (minutes - 720) // 3
+        section = 4
+    elif 900 <= minutes <= 1079:     # 13:00 - 15:59 UTC
+        area = (minutes - 900) // 3
+        section = 5
+    elif 1080 <= minutes <= 1259:    # 16:00 - 18:59 UTC
+        area = (minutes - 1080) // 3
+        section = 6
+    elif 1260 <= minutes <= 1349:    # 19:00 - 20:29 UTC
+        area = 60 + ((minutes - 1260) // 3)
+        section = 0
+    else:                            # 20:30 - 21:59 UTC
+        area = 60 + ((minutes - 1350) // 3)
+        section = 1
+
     return area, section
 
 
@@ -1038,37 +1072,84 @@ def get_region_meta(region_id: int):
 
 def add_region_section(mapped: dict, row: Row):
     area, section = get_area_section(row)
-    day_label, section_kind, interpretation = SECTION_INFO.get(section, (f'Sektion {section}', '?', '?'))
     region_name, forecast_days = get_region_meta(area)
 
     mapped['region_id'] = area
     mapped['region_name'] = region_name
     mapped['forecast_days'] = forecast_days
     mapped['section_id'] = section
+
+    # Regions 60..89 use a reduced 2-day forecast model:
+    # one 90-minute block for today and one 90-minute block for the following day.
+    # Only day/night weather and one HI temperature are shown.
+    if area >= 60:
+        day_label = 'Heute' if section == 0 else 'Tag 1'
+        section_kind = '2-Tages-Prognose'
+        interpretation = 'nur Wetter Tag/Nacht + Temperatur (HI)'
+
+        mapped['day_label'] = day_label
+        mapped['section_kind'] = section_kind
+        mapped['interpretation'] = interpretation
+        mapped['is_high_section'] = False
+        mapped['is_low_wind_section'] = False
+        mapped['section7_high_override'] = False
+        mapped['display_day_weather'] = mapped['day_weather']
+        mapped['display_day_code'] = mapped['day_code']
+        mapped['display_night_weather'] = mapped['night_weather']
+        mapped['display_night_code'] = mapped['night_code']
+        mapped['section_value_text'] = '-'
+        mapped['temp_text'] = f"{mapped['temp_text']} (HI)"
+        return mapped
+
+    day_label, section_kind, interpretation = SECTION_INFO.get(section, (f'Sektion {section}', '?', '?'))
     mapped['day_label'] = day_label
     mapped['section_kind'] = section_kind
     mapped['interpretation'] = interpretation
     mapped['is_high_section'] = section in (0, 2, 4, 6)
     mapped['is_low_wind_section'] = section in (1, 3, 5, 7)
+    mapped['section7_high_override'] = (
+        ENABLE_SECTION7_OVERRIDE and section == 7 and mapped['anomaly_bit'] == 0
+    )
 
-    if mapped['is_high_section']:
-        if mapped['anomaly_bit'] == 0:
-            mapped['section_value_text'] = (
-                f"Extrem = {mapped['extreme_text']} (Code {mapped['extreme_code']}), "
-                f"Regen = {mapped['rain_percent']} %"
-            )
-        else:
+    if mapped['is_high_section'] or mapped['section7_high_override']:
+        mapped['display_day_weather'] = mapped['day_weather']
+        mapped['display_day_code'] = mapped['day_code']
+        mapped['display_night_weather'] = mapped['night_weather']
+        mapped['display_night_code'] = mapped['night_code']
+
+        # The Bit-15 anomaly interpretation for "Tag" is only valid for
+        # section 0 (Heute / Hoch). For forecast days (sections 2/4/6),
+        # Bit 15 is treated as not applicable and the block is always
+        # interpreted as extreme weather + rain. This makes the decoder
+        # more robust against occasional bit errors in later high sections.
+        mapped['day_anomaly_mode_valid'] = (section == 0)
+
+        if mapped['anomaly_bit'] == 1 and mapped['day_anomaly_mode_valid']:
             mapped['section_value_text'] = (
                 f"Relatives Vormittagswetter = {mapped['morning_jump_text']} (Code {mapped['morning_jump_code']}), "
                 f"Sonnenscheindauer = {mapped['sunshine_text']} (Code {mapped['sunshine_code']}), "
                 f"Regen = {mapped['rain_percent']} %"
             )
+        else:
+            mapped['section_value_text'] = (
+                f"Schweres Wetter = {mapped['extreme_text']} (Code {mapped['extreme_code']}), "
+                f"Regen = {mapped['rain_percent']} %"
+            )
     else:
-        mapped['section_value_text'] = (
-            f"Wind = {mapped['wind_direction']} (Code {mapped['wind_dir_code']}), "
-            f"Stärke = {mapped['wind_force']} (Code {mapped['wind_force_code']})"
-        )
+        mapped['display_day_weather'] = mapped['day_weather']
+        mapped['display_day_code'] = mapped['day_code']
+        mapped['display_night_weather'] = mapped['night_weather']
+        mapped['display_night_code'] = mapped['night_code']
 
+        if mapped['anomaly_bit'] == 0:
+            mapped['section_value_text'] = (
+                f"Wind = {mapped['wind_direction']} (Code {mapped['wind_dir_code']}), "
+                f"Stärke = {mapped['wind_force']} (Code {mapped['wind_force_code']})"
+            )
+        else:
+            mapped['section_value_text'] = (
+                f"Schweres Wetter = {mapped['extreme_text']} (Code {mapped['extreme_code']})"
+            )
     return mapped
 
 
@@ -1295,16 +1376,26 @@ def print_meteotime_result(result):
         print(f"  payload : {r['payload_hex']}")
         print(f"  region  : {r['region_id']} - {r['region_name']} ({r['forecast_days']}-Tagesprognose)")
         print(f"  section : {r['section_id']} - {r['day_label']} / {r['section_kind']}")
-        print(f"  day     : {r['day_weather']} (Code {r['day_code']})")
-        print(f"  night   : {r['night_weather']} (Code {r['night_code']})")
+        if r['display_day_code'] is None:
+            print(f"  day     : {r['display_day_weather']}")
+        else:
+            print(f"  day     : {r['display_day_weather']} (Code {r['display_day_code']})")
+        if r['display_night_code'] is None:
+            print(f"  night   : {r['display_night_weather']}")
+        else:
+            print(f"  night   : {r['display_night_weather']} (Code {r['display_night_code']})")
         print(f"  temp    : {r['temp_text']} (Code {r['temp_code']})")
         print(f"  anomaly : {r['anomaly_bit']}")
+        if r.get('is_low_wind_section') and not r.get('section7_high_override'):
+            if r['anomaly_bit'] == 0:
+                print(
+                    f"  wind    : {r['wind_direction']}, Stärke {r['wind_force']} "
+                    f"(Code {r['wind_full_code']}, dir={r['wind_dir_code']}, force={r['wind_force_code']})"
+                )
+            else:
+                print("  wind    : -")
         print(f"  detail  : {r['section_value_text']}")
         print(f"  bits8..11: {r['bits8_11_mode']} -> {r['bits8_11_text']}")
-        print(
-            f"  wind    : {r['wind_direction']}, Stärke {r['wind_force']} "
-            f"(Code {r['wind_full_code']}, dir={r['wind_dir_code']}, force={r['wind_force_code']})"
-        )
         print('  cipher  : ' + ' '.join(f'{x:02X}' for x in result['cipher']))
         print('  key     : ' + ' '.join(f'{x:02X}' for x in result['key']))
         print('  plain   : ' + ' '.join(f'{x:02X}' for x in result['plain']))
@@ -1317,7 +1408,7 @@ def print_meteotime_result(result):
 
 def main():
     print("DCF77 live Meteotime decoder on GPIO17")
-    print("Conservative version: original pulse/minute logic + upgraded Meteotime decoder")
+    print("Live decoder aligned to the current reference offline decoder")
     print("LOW phase is treated as pulse, HIGH phase as pause/minute marker")
     print(f"Web status JSON: {STATUS_JSON_PATH}")
     print("Waiting for minute frames...\n")
