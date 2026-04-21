@@ -1089,11 +1089,11 @@ def get_area_section(row: Row):
         area = (schedule_minutes - 900) // 3
         section = 5
     elif 1080 <= schedule_minutes <= 1169:
-        area = (schedule_minutes - 1080) // 3
-        section = 6
+       area = (schedule_minutes - 1080) // 3          # 0..29
+       section = 6
     elif 1170 <= schedule_minutes <= 1259:
-        area = (schedule_minutes - 1170) // 3
-        section = 7
+       area = 30 + ((schedule_minutes - 1170) // 3)   # 30..59
+       section = 7
     elif 1260 <= schedule_minutes <= 1349:
         area = 60 + ((schedule_minutes - 1260) // 3)
         section = 0
