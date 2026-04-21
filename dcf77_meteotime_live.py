@@ -273,21 +273,62 @@ mByteArrLookupTable1C_3 = [
     0x08, 0x00, 0x0D, 0x0F, 0x01, 0x0C, 0x03, 0x06, 0x0B, 0x04, 0x09, 0x05, 0x0A, 0x07, 0x02, 0x0E,
     0x03, 0x0D, 0x00, 0x0C, 0x09, 0x06, 0x0F, 0x0B, 0x01, 0x0E, 0x08, 0x0A, 0x02, 0x07, 0x04, 0x05
 ]
+# These are the weather codes from the document DB W-Protokoll-V 1.pdf (DB W-Protokoll-V1.0.doc).
+# These codes seem to interpret data often as "Frontengewitter" or "Nebel".
+#WEATHER_CODES_DAY = {
+#    0: "--", 1: "Sonnig", 2: "Leicht bewölkt", 3: "Vorwiegend bewölkt",
+#    4: "Bedeckt", 5: "Hochnebel", 6: "Nebel", 7: "Regenschauer",
+#    8: "Leichter Regen", 9: "Starker Regen", 10: "Frontengewitter",
+#    11: "Wärmegewitter", 12: "Schneeregenschauer", 13: "Schneeschauer",
+#    14: "Schneeregen", 15: "Schneefall",
+#}
 
+#WEATHER_CODES_NIGHT = {
+#    0: "--", 1: "Klar", 2: "Leicht bewölkt", 3: "Vorwiegend bewölkt",
+#    4: "Bedeckt", 5: "Hochnebel", 6: "Nebel", 7: "Regenschauer",
+#    8: "Leichter Regen", 9: "Starker Regen", 10: "Frontengewitter",
+#    11: "Wärmegewitter", 12: "Schneeregenschauer", 13: "Schneeschauer",
+#    14: "Schneeregen", 15: "Schneefall",
+#}
+
+# These are the weather codes from the public available implementations.
+# They seem to interpret data more plausible, also compared to a hardware DCF77 weather clock.
 WEATHER_CODES_DAY = {
-    0: "--", 1: "Sonnig", 2: "Leicht bewölkt", 3: "Vorwiegend bewölkt",
-    4: "Bedeckt", 5: "Hochnebel", 6: "Nebel", 7: "Regenschauer",
-    8: "Leichter Regen", 9: "Starker Regen", 10: "Frontengewitter",
-    11: "Wärmegewitter", 12: "Schneeregenschauer", 13: "Schneeschauer",
-    14: "Schneeregen", 15: "Schneefall",
+    0: "--",
+    1: "Sonnig",
+    2: "Leicht bewölkt",
+    3: "Vorwiegend bewölkt",
+    4: "Bedeckt",
+    5: "Wärmegewitter",
+    6: "Starker Regen",
+    7: "Schnee",
+    8: "Nebel",
+    9: "Schneeregen",
+    10: "Regenschauer",
+    11: "Leichter Regen",
+    12: "Schneeschauer",
+    13: "Frontengewitter",
+    14: "Hochnebel",
+    15: "Schneefall",
 }
 
 WEATHER_CODES_NIGHT = {
-    0: "--", 1: "Klar", 2: "Leicht bewölkt", 3: "Vorwiegend bewölkt",
-    4: "Bedeckt", 5: "Hochnebel", 6: "Nebel", 7: "Regenschauer",
-    8: "Leichter Regen", 9: "Starker Regen", 10: "Frontengewitter",
-    11: "Wärmegewitter", 12: "Schneeregenschauer", 13: "Schneeschauer",
-    14: "Schneeregen", 15: "Schneefall",
+    0: "--",
+    1: "Klar",
+    2: "Leicht bewölkt",
+    3: "Vorwiegend bewölkt",
+    4: "Bedeckt",
+    5: "Wärmegewitter",
+    6: "Starker Regen",
+    7: "Schnee",
+    8: "Nebel",
+    9: "Schneeregen",
+    10: "Regenschauer",
+    11: "Leichter Regen",
+    12: "Schneeschauer",
+    13: "Frontengewitter",
+    14: "Hochnebel",
+    15: "Schneefall",
 }
 
 EXTREME_CODES = {
@@ -460,7 +501,7 @@ REGIONS_ALL = {
     1: "La Rochelle / Westküste Frankreich",
     2: "Paris / Pariser Becken",
     3: "Brest / Bretagne",
-    4: "Clermont-Ferrand / Zentralmassif",
+    4: "Clermont-Ferrand / Zentralmassiv",
     5: "Béziers / Languedoc-Roussillon",
     6: "Bruxelles / Benelux",
     7: "Dijon / Ostfrankreich (Burgund)",
@@ -532,7 +573,7 @@ SECTION_INFO = {
     4: ("Tag 2", "Tag-Block", "12h Tag + 24h Schweres Wetter/Regen"),
     5: ("Tag 2", "Nacht-Block", "12h Nacht + 24h Wind"),
     6: ("Tag 3", "Tag-Block", "12h Tag + 24h Schweres Wetter/Regen"),
-    7: ("ungenutzt", "ungenutzt", "ungenutzt"),
+    7: ("Tag 3", "Tag-Block", "12h Tag + 24h Schweres Wetter/Regen"),
 }
 
 
@@ -916,11 +957,16 @@ def decode_weather_info(payload: int):
     night_code = swab_nibble(info[0] & 0x0F)
     anomaly = info[1] & 0x01
 
+    # Bits 8..11 are one mirrored 4-bit field.
+    # If anomaly_bit == 0: extreme weather code
+    # If anomaly_bit == 1: bits 8..9 = relative morning weather, bits 10..11 = sunshine duration
     bits8_11 = swab_nibble(info[1] >> 4)
     extreme_code = bits8_11
     morning_jump_code = bits8_11 & 0x03
     sunshine_code = (bits8_11 >> 2) & 0x03
 
+    # Rain probability is a 3-bit field in bits 1..3 of info[1].
+    # Extract the field cleanly first, then reverse the 3-bit order.
     rain_raw = (info[1] >> 1) & 0x07
     rain_group = ((rain_raw & 0x01) << 2) | (rain_raw & 0x02) | ((rain_raw & 0x04) >> 2)
     rain_percent = min(rain_group * 15, 100)
@@ -948,7 +994,6 @@ def decode_weather_info(payload: int):
             f"Sonnenscheindauer = {SUNSHINE_DURATION_CODES.get(sunshine_code, f'Code {sunshine_code}')}"
         )
 
-    wind_full_code = (rain_group << 4) | extreme_code
 
     return {
         'payload_hex': f'0x{payload:06X}',
@@ -973,8 +1018,8 @@ def decode_weather_info(payload: int):
         'rain_percent': rain_percent,
         'wind_dir_code': extreme_code,
         'wind_force_code': rain_group,
-        'wind_full_code': wind_full_code,
-        'wind_direction': WIND_DIRECTION_CODES.get(wind_full_code, f'Code {wind_full_code}'),
+        'wind_full_code': (rain_group << 4) | extreme_code,
+        'wind_direction': WIND_DIRECTION_CODES.get((rain_group << 4) | extreme_code, f'Code {(rain_group << 4) | extreme_code}'),
         'wind_force': WIND_FORCE.get(rain_group, f'Code {rain_group}'),
         'wind_direction_valid_when_anomaly_bit_is_0': True,
         'temp_code': temp_code,
@@ -1013,7 +1058,7 @@ def is_dst_europe_local(row: Row) -> bool:
 
 def get_minutes_since_2200_utc_anchor(row: Row) -> int:
     hours = row.hh
-    hours -= 1
+    hours -= 1  # CET -> UTC
     if is_dst_europe_local(row):
         hours -= 1
     hours -= 22
@@ -1023,42 +1068,37 @@ def get_minutes_since_2200_utc_anchor(row: Row) -> int:
 
 
 def get_area_section(row: Row):
-    minutes = get_minutes_since_2200_utc_anchor(row)
+    schedule_minutes = (get_minutes_since_2200_utc_anchor(row) - 1) % (24 * 60)
 
-    # Meteotime send schema in UTC:
-    # 22:00 - 03:59  regions 0..59  -> Heute   (sections 0/1, 6 min per region)
-    # 04:00 - 09:59  regions 0..59  -> Tag 1   (sections 2/3, 6 min per region)
-    # 10:00 - 15:59  regions 0..59  -> Tag 2   (sections 4/5, 6 min per region)
-    # 16:00 - 18:59  regions 0..59  -> Tag 3   (section 6 only, 3 min per region)
-    # 19:00 - 20:29  regions 60..89 -> Heute   (2-day model, HI only)
-    # 20:30 - 21:59  regions 60..89 -> Tag 1   (2-day model, HI only)
-
-    if 0 <= minutes <= 179:          # 22:00 - 00:59 UTC
-        area = minutes // 3
+    if 0 <= schedule_minutes <= 179:
+        area = schedule_minutes // 3
         section = 0
-    elif 180 <= minutes <= 359:      # 01:00 - 03:59 UTC
-        area = (minutes - 180) // 3
+    elif 180 <= schedule_minutes <= 359:
+        area = (schedule_minutes - 180) // 3
         section = 1
-    elif 360 <= minutes <= 539:      # 04:00 - 06:59 UTC
-        area = (minutes - 360) // 3
+    elif 360 <= schedule_minutes <= 539:
+        area = (schedule_minutes - 360) // 3
         section = 2
-    elif 540 <= minutes <= 719:      # 07:00 - 09:59 UTC
-        area = (minutes - 540) // 3
+    elif 540 <= schedule_minutes <= 719:
+        area = (schedule_minutes - 540) // 3
         section = 3
-    elif 720 <= minutes <= 899:      # 10:00 - 12:59 UTC
-        area = (minutes - 720) // 3
+    elif 720 <= schedule_minutes <= 899:
+        area = (schedule_minutes - 720) // 3
         section = 4
-    elif 900 <= minutes <= 1079:     # 13:00 - 15:59 UTC
-        area = (minutes - 900) // 3
+    elif 900 <= schedule_minutes <= 1079:
+        area = (schedule_minutes - 900) // 3
         section = 5
-    elif 1080 <= minutes <= 1259:    # 16:00 - 18:59 UTC
-        area = (minutes - 1080) // 3
+    elif 1080 <= schedule_minutes <= 1169:
+        area = (schedule_minutes - 1080) // 3
         section = 6
-    elif 1260 <= minutes <= 1349:    # 19:00 - 20:29 UTC
-        area = 60 + ((minutes - 1260) // 3)
+    elif 1170 <= schedule_minutes <= 1259:
+        area = (schedule_minutes - 1170) // 3
+        section = 7
+    elif 1260 <= schedule_minutes <= 1349:
+        area = 60 + ((schedule_minutes - 1260) // 3)
         section = 0
-    else:                            # 20:30 - 21:59 UTC
-        area = 60 + ((minutes - 1350) // 3)
+    else:
+        area = 60 + ((schedule_minutes - 1350) // 3)
         section = 1
 
     return area, section
@@ -1092,7 +1132,6 @@ def add_region_section(mapped: dict, row: Row):
         mapped['interpretation'] = interpretation
         mapped['is_high_section'] = False
         mapped['is_low_wind_section'] = False
-        mapped['section7_high_override'] = False
         mapped['display_day_weather'] = mapped['day_weather']
         mapped['display_day_code'] = mapped['day_code']
         mapped['display_night_weather'] = mapped['night_weather']
@@ -1105,13 +1144,9 @@ def add_region_section(mapped: dict, row: Row):
     mapped['day_label'] = day_label
     mapped['section_kind'] = section_kind
     mapped['interpretation'] = interpretation
-    mapped['is_high_section'] = section in (0, 2, 4, 6)
-    mapped['is_low_wind_section'] = section in (1, 3, 5, 7)
-    mapped['section7_high_override'] = (
-        ENABLE_SECTION7_OVERRIDE and section == 7 and mapped['anomaly_bit'] == 0
-    )
-
-    if mapped['is_high_section'] or mapped['section7_high_override']:
+    mapped['is_high_section'] = section in (0, 2, 4, 6, 7)
+    mapped['is_low_wind_section'] = section in (1, 3, 5)
+    if mapped['is_high_section']:
         mapped['display_day_weather'] = mapped['day_weather']
         mapped['display_day_code'] = mapped['day_code']
         mapped['display_night_weather'] = mapped['night_weather']
